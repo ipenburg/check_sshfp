@@ -120,12 +120,20 @@ def check_sshfp_for_host(args: argparse.Namespace):
     for record in sshfp_records.rrset:
         sshfps.setdefault(SSHFP_KEY_ALGS[record.algorithm], {'seen': False, 'fingerprints': []})['fingerprints'].append((SSHFP_FP_ALGS[record.fp_type], record.fingerprint))
 
+    family = '';
+    if args.ipv4:
+        family = "-4"
+    if args.ipv6:
+        family = "-6"
+    if args.ipv4 and args.ipv6:
+        family = '';
+
     # ssh-keyscan puts status info on stderr, and there's no option
     # to make it not do that. But we still want real errors to be
     # passed through on stderr... and keys (on stdout) might be big,
     # so we might deadlock if we read all the way through one stdio
     # stream without also reading the other simultaneously... DansGame.
-    subproc = subprocess.Popen(['ssh-keyscan', '-t', 'rsa,dsa,ecdsa,ed25519', '-p', str(args.port), args.host], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subproc = subprocess.Popen(['ssh-keyscan', family, '-t', 'rsa,dsa,ecdsa,ed25519', '-p', str(args.port), args.host], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = subproc.communicate()
     cleaned_stderr = '\n'.join(line for line in stderr.decode().splitlines() if not line.startswith('#'))
     # It can also return 0 even if there were critical problems
@@ -164,6 +172,8 @@ def main() -> None:
 
     parser.add_argument("--host", "-H", dest="host", required=True, help="Hostname to check.")
     parser.add_argument("--port", "-p", type=int, required=True, help="TCP port to check.")
+    parser.add_argument("-4", "--ipv4", action="store_true", help="IPv4 family only for ssh-keyscan")
+    parser.add_argument("-6", "--ipv6", action="store_true", help="IPv6 family only for ssh-keyscan")
     parser.add_argument("--no-dnssec", dest="dnssec", action="store_false",
                         help="Continue even when DNS replies aren't DNSSEC authenticated.")
     parser.add_argument("--nameserver", help="Use a custom nameserver.")
